@@ -1,0 +1,199 @@
+
+String details = "Manufacturer : "+Build.MANUFACTURER
+        + ", Model : " + Build.MODEL + ", OS_version : " + Build.VERSION.RELEASE
+        + ", OS_name : " + Build.VERSION_CODES.class.getFields()[android.os.Build.VERSION.SDK_INT].getName();
+
+
+// Api interface in Url
+@Headers("Content-Type: application/json")
+@POST("device")
+Maybe<String> SendDeviceDetails(@Body dataDetails details);
+
+// Api interface call
+ApiInterface apiService1 = RestClient.getClient().create(ApiInterface.class);
+
+Single
+	Single always emits only one value or throws an error. The same job can be done using Observable too with a single emission but Single always makes sure there is an emission. A use case of Single would be making a network call to get response as the response will be fetched at once.
+
+            apiService1.SendDeviceDetails(details)
+                     .subscribeOn(Schedulers.io())
+                     .observeOn(AndroidSchedulers.mainThread())
+                     .subscribeWith(new DisposableSingleObserver<String>() {
+                         @Override
+                         public void onSuccess(String msg) {
+                             System.out.println("watsssssppppp"+msg);
+                         }
+            
+                         @Override
+                         public void onError(Throwable e) {
+                             System.out.println(e.getMessage());
+                         }
+                     });
+
+Observables
+	Observable is probably most used observable among all. Observable can emit one or more items.
+
+            Observable<String> deviceObservable = apiService1.SendDeviceDetails(details);
+             Observer<String> deviceObserver = getDeviceObserver();
+
+             deviceObservable.observeOn(Schedulers.io())
+                     .subscribeOn(AndroidSchedulers.mainThread())
+
+                     //filter option for emitting the required data en rest ignored e.g result starting with letter “b”
+                     .filter(new Predicate<String>() {
+                        @Override
+                        public boolean test(String s) throws Exception {
+                            return s.toLowerCase().startsWith("b");
+                            }
+                        })
+                     .subscribeWith(deviceObserver);
+            
+            private Observer<String> getDeviceObserver() {
+                return new Observer<String>() {
+                    @Override
+                    public void onSubscribe(Disposable d) {
+                        Log.d(TAG, "onSubscribe");
+                    }
+            
+                    @Override
+                    public void onNext(String s) {
+                        Log.d(TAG, "Name: " + s);
+                    }
+            
+                    @Override
+                    public void onError(Throwable e) {
+                        Log.e(TAG, "onError: " + e.getMessage());
+                    }
+            
+                    @Override
+                    public void onComplete() {
+                        Log.d(TAG, "All items are emitted!");
+                    }
+                };
+            }
+
+Maybe
+	Maybe observable may or may not emit a value. This observable can be used when you are expecting an item to be emitted optionally.
+
+            Maybe<String> noteObservable = apiService1.SendDeviceDetails(details);
+            
+            MaybeObserver<String> noteObserver = getNoteObserver();
+            
+            noteObservable.subscribeOn(Schedulers.io())
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .subscribe(noteObserver);
+            
+            private MaybeObserver<String> getNoteObserver() {
+                return new MaybeObserver<String>() {
+                    @Override
+                    public void onSubscribe(Disposable d) {
+                        disposable = d;
+                    }
+            
+                    @Override
+                    public void onSuccess(String note) {
+                        Log.d(TAG, "onSuccess: " + note);
+                    }
+            
+                    @Override
+                    public void onError(Throwable e) {
+                        Log.e(TAG, "onError: " + e.getMessage());
+                    }
+            
+                    @Override
+                    public void onComplete() {
+                        Log.e(TAG, "onComplete");
+                    }
+                };
+               }
+
+           @Override
+               protected void onDestroy() {
+                    super.onDestroy();
+                    disposable.dispose();
+            }
+
+Completable & CompletableObserver
+	Completable observable won’t emit any data instead it notifies the status of the task either success or failure. This observable can be used when you want to perform some task and not expect any value. A use case would be updating some data on the server by making PUT request.
+
+                Completable completableObservable = apiService1.SendDeviceDetails(details);
+                 
+                        CompletableObserver completableObserver = completableObserver();
+                 
+                        completableObservable
+                                .subscribeOn(Schedulers.io())
+                                .observeOn(AndroidSchedulers.mainThread())
+                                .subscribe(completableObserver);
+
+                private CompletableObserver completableObserver() {
+                        return new CompletableObserver() {
+                            @Override
+                            public void onSubscribe(Disposable d) {
+                                Log.d(TAG, "onSubscribe");
+                                disposable = d;
+                            }
+                 
+                            @Override
+                            public void onComplete() {
+                                Log.d(TAG, "onComplete: Note updated successfully!");
+                            }
+                 
+                            @Override
+                            public void onError(Throwable e) {
+                                Log.e(TAG, "onError: " + e.getMessage());
+                            }
+                        };
+                    }
+                 
+                    @Override
+                    protected void onDestroy() {
+                        super.onDestroy();
+                        disposable.dispose();
+                    }
+
+
+Flowable & Observer
+	Flowable observable should be used when an Observable is generating huge amount of events/data than the Observer can handle. As per doc, Flowable can be used when the source is generating 10k+ events and subscriber can’t consume it all.
+
+                Flowable<Integer> flowableObservable = apiService1.SendDeviceDetails(details);
+                 
+                        SingleObserver<Integer> observer = getFlowableObserver();
+                 
+                        flowableObservable
+                                .subscribeOn(Schedulers.io())
+                                .observeOn(AndroidSchedulers.mainThread())
+                                .reduce(0, new BiFunction<Integer, Integer, Integer>() {
+                                    @Override
+                                    public Integer apply(Integer result, Integer number) {
+                                        //Log.e(TAG, "Result: " + result + ", new number: " + number);
+                                        return result + number;
+                                    }
+                                })
+                                .subscribe(observer);
+
+
+                private SingleObserver<Integer> getFlowableObserver() {
+                        return new SingleObserver<Integer>() {
+                            @Override
+                            public void onSubscribe(Disposable d) {
+                                Log.d(TAG, "onSubscribe");
+                                disposable = d;
+                            }
+                 
+                            @Override
+                            public void onSuccess(Integer integer) {
+                                Log.d(TAG, "onSuccess: " + integer);
+                            }
+                 
+                            @Override
+                            public void onError(Throwable e) {
+                                Log.e(TAG, "onError: " + e.getMessage());
+                            }
+                        };
+                    }
+
+                @Override
+                    protected void onDestroy() {
+                        super.onDestroy();
+                        disposable.dispose();
+                    }
